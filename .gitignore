@@ -21,3 +21,6 @@ act.sh
 log
 
 ci_scripts
+
+# local build artifacts
+build/
