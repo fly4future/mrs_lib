@@ -237,6 +237,9 @@ int SafetyZone::addObstacle(std::unique_ptr<Prism> obstacle) {
 void SafetyZone::deleteObstacle(int id) {
   std::scoped_lock lock(mutex_safety_zone_);
   auto it = obstacles_.find(id);
+  if (it == obstacles_.end()) {
+    return;  // erase(end()) is undefined behaviour
+  }
   obstacles_.erase(it); // this will automatically delete the obstacle in the map
 }
 

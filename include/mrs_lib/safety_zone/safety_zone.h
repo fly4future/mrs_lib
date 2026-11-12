@@ -67,7 +67,7 @@ private:
   std::map<int, std::unique_ptr<Prism>> obstacles_;
   mutable std::mutex mutex_safety_zone_;
   int next_obstacle_id_ = 0;
-  bool safety_zone_enabled_;
+  bool safety_zone_enabled_ = true;
 
   // Used to discretize between start and end for the path validation
   int _discretization_steps_ = 20;
