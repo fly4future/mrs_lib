@@ -10,6 +10,8 @@
 #include <ros/ros.h>
 #include <memory>
 #include <atomic>
+#include <mutex>
+#include <unordered_set>
 
 namespace gm = geometry_msgs;
 
@@ -37,7 +39,7 @@ namespace mrs_lib
     void cleanup() override;
 
   private:
-    void init();
+    void init(const double markers_update_rate);
     void sendMarker([[maybe_unused]] const ros::TimerEvent& event);
     std::tuple<bool, gm::Point> transformPoint(gm::Point point, std::string& frame_id, geometry_msgs::TransformStamped tf);
 
@@ -56,6 +58,8 @@ namespace mrs_lib
     ros::Publisher publisher_;
     ros::Timer timer_;
     static visualization_msgs::MarkerArray last_markers_;
+    static std::mutex last_markers_mutex_;
+    static std::unordered_set<const StaticEdgesVisualization*> live_instances_;
 
   };  // class StaticEdgesVisualization
 }  // namespace mrs_lib

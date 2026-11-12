@@ -11,6 +11,8 @@ namespace mrs_lib
 
   std::atomic<int> StaticEdgesVisualization::id_generator_ = 0;
   visualization_msgs::MarkerArray StaticEdgesVisualization::last_markers_ = visualization_msgs::MarkerArray();
+  std::mutex StaticEdgesVisualization::last_markers_mutex_;
+  std::unordered_set<const StaticEdgesVisualization*> StaticEdgesVisualization::live_instances_;
 
   /* StaticEdgesVisualization(prism) //{ */
 
@@ -18,9 +20,7 @@ namespace mrs_lib
                                                      const double& markers_update_rate)
       : id_(id_generator_++), prism_(prism), uav_name_(uav_name), frame_id_(frame_id), nh_(nh)
   {
-    timer_ = nh_.createTimer(ros::Rate(markers_update_rate), &StaticEdgesVisualization::sendMarker, this);
-    last_markers_.markers.push_back(vm::Marker());
-    init();
+    init(markers_update_rate);
   }
 
   //}
@@ -32,9 +32,7 @@ namespace mrs_lib
 
       : id_(id_generator_++), prism_(safety_zone->getObstacle(obstacle_id)), uav_name_(uav_name), frame_id_(frame_id), nh_(nh)
   {
-    timer_ = nh_.createTimer(ros::Rate(markers_update_rate), &StaticEdgesVisualization::sendMarker, this);
-    last_markers_.markers.push_back(vm::Marker());
-    init();
+    init(markers_update_rate);
   }
 
   //}
@@ -46,9 +44,7 @@ namespace mrs_lib
 
       : id_(id_generator_++), prism_(safety_zone->getBorder()), uav_name_(uav_name), frame_id_(frame_id), nh_(nh)
   {
-    last_markers_.markers.push_back(vm::Marker());
-    timer_ = nh_.createTimer(ros::Rate(markers_update_rate), &StaticEdgesVisualization::sendMarker, this);
-    init();
+    init(markers_update_rate);
   }
 
   //}
@@ -57,6 +53,11 @@ namespace mrs_lib
 
   StaticEdgesVisualization::~StaticEdgesVisualization()
   {
+    {
+      std::scoped_lock lock(last_markers_mutex_);
+      live_instances_.erase(this);
+    }
+    timer_.stop();
     if (is_active_)
     {
       prism_->unsubscribe(this);
@@ -68,12 +69,25 @@ namespace mrs_lib
 
   /* init() //{ */
 
-  void StaticEdgesVisualization::init()
+  void StaticEdgesVisualization::init(const double markers_update_rate)
   {
+    {
+      // ids come from a global counter, so slots may be requested out of order -> size by id, not by push_back
+      std::scoped_lock lock(last_markers_mutex_);
+      if (last_markers_.markers.size() <= static_cast<size_t>(id_))
+      {
+        last_markers_.markers.resize(id_ + 1);
+      }
+      live_instances_.insert(this);
+    }
+
     publisher_ = nh_.advertise<vm::MarkerArray>("safety_area_static_markers_out", 1);
     prism_->subscribe(this);
     update();
     is_active_ = true;  // is_active_ flag inherited from Subscriber class (defined in Prism)
+
+    // the timer is started last: it fires on another thread and must not see a half-constructed object (invalid publisher_)
+    timer_ = nh_.createTimer(ros::Rate(markers_update_rate), &StaticEdgesVisualization::sendMarker, this);
   }
 
   //}
@@ -83,6 +97,11 @@ namespace mrs_lib
   // Lines must be updated periodically. View https://github.com/ros-visualization/rviz/issues/1287
   void StaticEdgesVisualization::sendMarker([[maybe_unused]] const ros::TimerEvent& event)
   {
+    std::scoped_lock lock(last_markers_mutex_);
+    if (live_instances_.count(this) == 0)
+    {
+      return;  // already destroyed (callback was in flight while the timer was being stopped)
+    }
     publisher_.publish(last_markers_);
   }
 
@@ -155,6 +174,7 @@ namespace mrs_lib
       marker.points.push_back(lower_start);
     }
 
+    std::scoped_lock lock(last_markers_mutex_);
     last_markers_.markers[id_] = marker;
     publisher_.publish(last_markers_);
   }
@@ -165,7 +185,10 @@ namespace mrs_lib
 
   void StaticEdgesVisualization::cleanup()
   {
-    last_markers_.markers[id_].action = vm::Marker::DELETE;
+    {
+      std::scoped_lock lock(last_markers_mutex_);
+      last_markers_.markers[id_].action = vm::Marker::DELETE;
+    }
     is_active_ = false;
   }
 
