@@ -65,7 +65,7 @@ namespace mrs_lib
 
   void BoundsControl::init()
   {
-    server_ = std::make_unique<interactive_markers::InteractiveMarkerServer>(nh_.getNamespace() + "/safety_area_bounds_out", std::to_string(id_), false);
+    server_ = std::make_unique<interactive_markers::InteractiveMarkerServer>(nh_.getNamespace() + "/safety_area_bounds_out", std::to_string(id_), true);  // own spin thread, joined in the destructor
     menu_handler_ = std::make_unique<interactive_markers::MenuHandler>();
     if (safety_zone_)
     {

@@ -50,7 +50,7 @@ namespace mrs_lib
 
   void VertexControl::init()
   {
-    server_ = std::make_unique<interactive_markers::InteractiveMarkerServer>(nh_.getNamespace() + "/safety_area_vertices_out", std::to_string(id_), false);
+    server_ = std::make_unique<interactive_markers::InteractiveMarkerServer>(nh_.getNamespace() + "/safety_area_vertices_out", std::to_string(id_), true);  // own spin thread, joined in the destructor
     // Menu
     menu_handler_ = std::make_unique<interactive_markers::MenuHandler>();
     menu_handler_->insert("Delete the vertex", [this](const vm::InteractiveMarkerFeedbackConstPtr& feedback) { this->vertexDeleteCallback(feedback); });
