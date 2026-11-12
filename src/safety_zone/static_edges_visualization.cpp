@@ -72,7 +72,7 @@ namespace mrs_lib
   void StaticEdgesVisualization::init(const double markers_update_rate)
   {
     {
-      // ids come from a global counter, so slots may be requested out of order -> size by id, not by push_back
+      // size by id: instances can be created out of order
       std::scoped_lock lock(last_markers_mutex_);
       if (last_markers_.markers.size() <= static_cast<size_t>(id_))
       {
@@ -86,7 +86,7 @@ namespace mrs_lib
     update();
     is_active_ = true;  // is_active_ flag inherited from Subscriber class (defined in Prism)
 
-    // the timer is started last: it fires on another thread and must not see a half-constructed object (invalid publisher_)
+    // start the timer last, it fires on another thread
     timer_ = nh_.createTimer(ros::Rate(markers_update_rate), &StaticEdgesVisualization::sendMarker, this);
   }
 
@@ -100,7 +100,7 @@ namespace mrs_lib
     std::scoped_lock lock(last_markers_mutex_);
     if (live_instances_.count(this) == 0)
     {
-      return;  // already destroyed (callback was in flight while the timer was being stopped)
+      return;  // already destroyed
     }
     publisher_.publish(last_markers_);
   }
